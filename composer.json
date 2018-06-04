@@ -1,0 +1,25 @@
+{
+  "name": "majorbio/ceph",
+  "description": "美吉生物ceph对象存储客户端",
+  "type": "library",
+  "keywords": [
+    "ceph",
+    "s3"
+  ],
+  "time": "2018-06-04",
+  "authors": [
+    {
+      "name": "刘国锋",
+      "email": "guofeng.liu@majorbio.com"
+    }
+  ],
+  "require": {
+    "aws/aws-sdk-php": "^3.60"
+  },
+  "license": "MIT",
+  "autoload": {
+    "psr-4": {
+      "majorbio\\": "src"
+    }
+  }
+}
