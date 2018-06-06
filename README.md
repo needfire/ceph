@@ -1,4 +1,4 @@
-# 说明文档
+# Ceph PHP 客户端
 
 **SDK 详细文档：**
 [https://docs.aws.amazon.com/aws-sdk-php/v3/api/api-s3-2006-03-01.html](https://docs.aws.amazon.com/aws-sdk-php/v3/api/api-s3-2006-03-01.html)
@@ -32,7 +32,7 @@ $ceph->s3->deleteBucket($args);
 $ceph->s3->getBucketsAcl($args);
 </pre>
 
-### 对象操作
+### Object操作
 <pre>
 $ceph->s3->existObject($args);
 $ceph->s3->createObject($args);
