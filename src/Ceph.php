@@ -162,74 +162,6 @@ class Ceph
     }
 
     /**
-     * 追加一个用户到acl <未完成>
-     *
-     * https://docs.aws.amazon.com/aws-sdk-php/v3/api/api-s3-2006-03-01.html#putbucketacl
-     *
-     * @param array $args = [
-     *                  Bucket = 'xxx',
-     *                  id = '',
-     *                  acl = 'private|public-read|public-read-write|authenticated-read',
-     *                  permission = 'FULL_CONTROL|WRITE|WRITE_ACP|READ|READ_ACP',
-     *                  Type = 'CanonicalUser|AmazonCustomerByEmail|Group'
-     *              ]
-     *
-     * @return mixed
-     */
-    public function appendBucketAcl($args = [])
-    {
-        if ( ! isset($args['Bucket'])) { return false; }
-        if ( ! isset($args['ID'])) { return false; }
-        if ( ! isset($args['ACL'])) { $args['ACL'] = 'public-read-write'; }
-        if ( ! isset($args['Permission'])) { $args['Permission'] = 'FULL_CONTROL'; }
-        if ( ! isset($args['Type'])) { $args['Type'] = 'CanonicalUser'; }
-        //先取出容器的ACL
-        if ( ! $this->existBucket(['Bucket'=>$args['Bucket']])) { return false; }
-        $old_acl = $this->getBucketAcl(['Bucket'=>$args['Bucket']]);
-        $Grants = [];
-        foreach($old_acl['Grants'] as $g) {
-            $g['Grantee']['Type'] = 'CanonicalUser';
-            $Grants[] = $g;
-        }
-        $Grants[] = [
-            'Grantee'=>[
-                'ID' => $args['ID'],
-                'Type' => $args['Type'],
-            ],
-            'Permission'=>$args['Permission']
-        ];
-        $params = [
-            'Bucket' => $args['Bucket'],
-            'ACL' => $args['ACL'],
-            'Grants' => $Grants,
-            'Owner' => $old_acl['Owner'],
-        ];
-        /*$params = array(
-            'ACL' => $args['ACL'],
-            'Grants' => array(
-                array(
-                    'Grantee' => array(
-                        'ID' => $args['ID'],
-                        'Type' => 'CanonicalUser',
-                    ),
-                    'Permission' => 'FULL_CONTROL',
-                ),
-                // ... repeated
-            ),
-            'Owner' => $old_acl['Owner'],
-            // Bucket is required
-            'Bucket' => $args['Bucket'],
-        );*/
-        //ddd($params,1,1);
-        $result = $this->s3->putBucketAcl($params)->toArray();
-        /*$result = $this->s3->putBucketAcl([
-            'Bucket' => $args['Bucket'],
-            'GrantFullControl' => 'id=guofeng.liu',
-        ]);*/
-        ddd($result,0,1);
-    }
-
-    /**
      * 对象是否存在
      *
      * @param array $args = [Bucket, Key]
@@ -267,7 +199,7 @@ class Ceph
     public function createObject($args = [])
     {
         try {
-            if ( ! isset($args['Body'])) { return false; }
+            if ( ! isset($args['Body']) && ! isset($args['SourceFile'])) { return false; }
             if ( ! isset($args['Bucket'])) { return false; }
             if ( ! isset($args['Key'])) { return false; }
             $this->s3->putObject($args)->toArray();
@@ -409,6 +341,36 @@ class Ceph
             return true === $full ? $result : $result['ObjectURL'];
         } catch (MultipartUploadException $e) {
             return $e->getMessage();
+        }
+    }
+
+    /**
+     * 创建对象<暂时只能账号内复制>
+     *
+     * @param array $args = [
+     *                  DestinationBucket = <string>,
+     *                  DestinationKey = <string>,
+     *                  CopySource = <string>
+     *              ]
+     * @return mixed
+     */
+    public function copyObject($args = [])
+    {
+        try {
+            if( ! isset($args['DestinationBucket'])){ return false; }
+            if( ! isset($args['DestinationKey'])){ return false; }
+            if( ! isset($args['CopySource'])){ return false; }
+            $this->s3->copyObject([
+                'Bucket' => $args['DestinationBucket'],
+                'Key' => $args['DestinationKey'],
+                'CopySource' => $args['CopySource'],
+            ]);
+            return $this->existObject([
+                'Bucket' => $args['DestinationBucket'],
+                'Key' => $args['DestinationKey']
+            ]);
+        } catch (\Exception $e) {
+            return null;
         }
     }
 }

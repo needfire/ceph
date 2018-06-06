@@ -37,6 +37,8 @@ $ceph->s3->getBucketsAcl(['Bucket'=>'my-bucket-1']);
 $ceph->s3->existObject(['Bucket'=>'my-bucket-1', 'Key'=>'my-obj-1']);
 //上传对象 Body = <string> 字符串类型
 $ceph->s3->createObject(['Bucket'=>'my-bucket-1', 'Key'=>'my-obj-1', 'Body'=>'hello world']);
+//SourceFile = '/路径/x'
+//$rs = $ceph->createObject(['Bucket'=>'lgf-1', 'Key'=>'s3.txt', 'SourceFile'=>'C:\Users\admin\Desktop\s3.txt']);
 //上传对象 Body = fopen('/路径/x') 资源类型
 $ceph->s3->createObject(['Bucket'=>'my-bucket-1', 'Key'=>'my-obj-1', 'Body'=>fopen('C:\Users\admin\Desktop\adobe.photoshop.cs3.rar', 'r')]);
 //上传对象 Source = '/路径/x'
@@ -47,6 +49,8 @@ $ceph->s3->deleteObject(['Bucket'=>'my-bucket-1', 'Key'=>'my-obj-1']);
 $ceph->s3->getObjectAcl(['Bucket'=>'my-bucket-1', 'Key'=>'my-obj-1']);
 //临时URL
 $ceph->s3->createPresignedRequest(['Bucket'=>'my-bucket-1', 'Key'=>'my-obj-1', 'expire'=>600]);
+//复制
+$rs = $ceph->copyObject(['DestinationBucket'=>'my-bucket-2', 'DestinationKey'=>'copy-my-obj-1', 'CopySource'=>'/my-bucket-1/my-obj-1']);
 ```
 
 > 参考 https://github.com/liushuangxi/ceph-amazons3-php
