@@ -121,7 +121,7 @@ class Ceph
     }
 
     /**
-     * 容器列表只包含容器名称
+     * 容器列表<只包含容器名称>
      *
      * https://docs.aws.amazon.com/aws-sdk-php/v3/api/api-s3-2006-03-01.html#listbuckets
      *
@@ -159,7 +159,7 @@ class Ceph
     }
 
     /**
-     * 追加一个用户到acl
+     * 追加一个用户到acl <未完成>
      *
      * https://docs.aws.amazon.com/aws-sdk-php/v3/api/api-s3-2006-03-01.html#putbucketacl
      *
@@ -224,5 +224,139 @@ class Ceph
             'GrantFullControl' => 'id=guofeng.liu',
         ]);*/
         ddd($result,0,1);
+    }
+
+    /**
+     * 对象是否存在
+     *
+     * @param array $args = [Bucket, Key]
+     *
+     * @return bool|null
+     */
+    public function existObject($args = [])
+    {
+        try {
+            if ( ! isset($args['Bucket'])) { return false; }
+            if ( ! isset($args['Key'])) { return false; }
+            $result = $this->s3->headObject($args)->toArray();
+            if (isset($result['@metadata']['statusCode']) && $result['@metadata']['statusCode'] == '200') {
+                return true;
+            } else {
+                return false;
+            }
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * 创建对象
+     *
+     * @param array $args = [Bucket, Key, Body[, ACL]]
+     *
+     * @return string|null
+     */
+    public function createObject($args = [])
+    {
+        try {
+            if ( ! isset($args['Body'])) { return false; }
+            if ( ! isset($args['Bucket'])) { return false; }
+            if ( ! isset($args['Key'])) { return false; }
+            $this->s3->putObject($args)->toArray();
+            return $this->existObject([
+                'Bucket' => $args['Bucket'],
+                'Key' => $args['Key']
+            ]);
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * 对象列表
+     *
+     * @param array $args = [Bucket]
+     *
+     * @return array|null
+     */
+    public function listObjects($args = [])
+    {
+        try {
+            if ( ! isset($args['Bucket'])) { return []; }
+            return $this->s3->listObjects($args)->toArray();
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * 对象列表<只包含容器名称>
+     *
+     * @param array $args = [Bucket]
+     *
+     * @return array|null
+     */
+    public function listObjectsNames($args = [])
+    {
+        try {
+            if ( ! isset($args['Bucket'])) { return []; }
+            $objects = $this->s3->listObjects($args)->toArray();
+            return array_column($objects['Contents'], 'Key');
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * 删除对象
+     *
+     * @param array $args = [Bucket, Key]
+     *
+     * @return bool|null
+     */
+    public function deleteObject($args = [])
+    {
+        try {
+            if ( ! isset($args['Bucket'])) { return false; }
+            if ( ! isset($args['Key'])) { return false; }
+            $this->s3->deleteObject($args)->toArray();
+            $exist = $this->existObject([
+                'Bucket' => $args['Bucket'],
+                'Key' => $args['Key']
+            ]);
+            if (is_null($exist)) {
+                return $exist;
+            } else {
+                return !$exist;
+            }
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * 生成签名下载地址
+     *
+     * @param array $args = [Bucket, Key, expire(秒)]
+     * @param bool  $only_url
+     *
+     * @return string|null
+     */
+    public function createPresignedRequest($args=[], $only_url=true)
+    {
+        try {
+            $command = $this->s3->getCommand(
+                'GetObject',
+                [
+                    'Bucket' => (string)$args['Bucket'],
+                    'Key' => (string)$args['Key']
+                ]
+            );
+            $expire = intval($args['expire']);
+            $request = $this->s3->createPresignedRequest($command, "+$expire seconds");
+            return true === $only_url ? (string)$request->getUri() : $request;
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 }
