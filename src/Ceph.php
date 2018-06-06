@@ -2,8 +2,11 @@
 namespace majorbio;
 
 use Aws\S3\S3Client;
+use Aws\S3\MultipartUploader;
+use Aws\Exception\MultipartUploadException;
 
 //https://docs.aws.amazon.com/aws-sdk-php/v3/api/api-s3-2006-03-01.html
+//https://github.com/awsdocs/aws-doc-sdk-examples/tree/master/php/example_code/s3
 
 class Ceph
 {
@@ -252,7 +255,12 @@ class Ceph
     /**
      * 创建对象
      *
-     * @param array $args = [Bucket, Key, Body[, ACL]]
+     * @param array $args = [
+     *                  Bucket = <string>,
+     *                  Key = <string>,
+     *                  Body = <string || resource || Psr\Http\Message\StreamInterface>
+     *                  [ ACL = 'private|public-read|public-read-write|authenticated-read|aws-exec-read|bucket-owner-read|bucket-owner-full-control' ]
+     *              ]
      *
      * @return string|null
      */
@@ -357,6 +365,50 @@ class Ceph
             return true === $only_url ? (string)$request->getUri() : $request;
         } catch (\Exception $e) {
             return null;
+        }
+    }
+
+    /**
+     * 得到对象ACL
+     *
+     * @param array $args = [Bucket, Key]
+     *
+     * @return mixed
+     */
+    public function getObjectAcl($args = [])
+    {
+        try {
+            if ( ! isset($args['Bucket'])) { return false; }
+            if ( ! isset($args['Key'])) { return false; }
+            return $this->s3->getObjectAcl($args)->toArray();
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
+     * 创建对象
+     *
+     * @param array $args = [
+     *                  Bucket = <string>,
+     *                  Key = <string>,
+     *                  Source = <file_path>
+     *              ]
+     * @param bool  $full
+     *
+     * @return mixed
+     */
+    public function multipartUpload($args=[], $full=true)
+    {
+        if ( ! isset($args['Bucket'])) { return false; }
+        if ( ! isset($args['Key'])) { return false; }
+        if ( ! isset($args['Source'])) { return false; }
+        $uploader = new MultipartUploader($this->s3, $args['Source'], ['bucket'=>$args['Bucket'], 'key'=>$args['Key']]);
+        try {
+            $result = $uploader->upload();
+            return true === $full ? $result : $result['ObjectURL'];
+        } catch (MultipartUploadException $e) {
+            return $e->getMessage();
         }
     }
 }
