@@ -3,8 +3,7 @@ namespace majorbio;
 
 use Aws\S3\S3Client;
 
-// 部分参考 https://github.com/liushuangxi/ceph-amazons3-php.git
-// https://docs.aws.amazon.com/aws-sdk-php/v3/api/api-s3-2006-03-01.html
+//https://docs.aws.amazon.com/aws-sdk-php/v3/api/api-s3-2006-03-01.html
 
 class Ceph
 {
