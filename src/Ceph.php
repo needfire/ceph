@@ -39,8 +39,6 @@ class Ceph
     /**
      * 创建容器
      *
-     * https://docs.aws.amazon.com/aws-sdk-php/v3/api/api-s3-2006-03-01.html#createbucket
-     *
      * @param array $args = [Bucket='xxx'[, ACL]]
      *
      * @return bool|null
@@ -58,8 +56,6 @@ class Ceph
 
     /**
      * 删除容器
-     *
-     * https://docs.aws.amazon.com/aws-sdk-php/v3/api/api-s3-2006-03-01.html#deletebucket
      *
      * @param array $args = [Bucket='xxx']
      *
@@ -84,8 +80,6 @@ class Ceph
     /**
      * 容器是否存在
      *
-     * https://docs.aws.amazon.com/aws-sdk-php/v3/api/api-s3-2006-03-01.html#headbucket
-     *
      * @param array $args = [Bucket='xxx']
      *
      * @return bool|null
@@ -108,8 +102,6 @@ class Ceph
     /**
      * 容器列表详细信息
      *
-     * https://docs.aws.amazon.com/aws-sdk-php/v3/api/api-s3-2006-03-01.html#listbuckets
-     *
      * @param array $args
      *
      * @return array|null
@@ -125,8 +117,6 @@ class Ceph
 
     /**
      * 容器列表<只包含容器名称>
-     *
-     * https://docs.aws.amazon.com/aws-sdk-php/v3/api/api-s3-2006-03-01.html#listbuckets
      *
      * @param array $args
      *
@@ -144,8 +134,6 @@ class Ceph
 
     /**
      * 得到容器ACL
-     *
-     * https://docs.aws.amazon.com/aws-sdk-php/v3/api/api-s3-2006-03-01.html#listbuckets
      *
      * @param array $args = [Bucket='xxx']
      *
@@ -248,6 +236,87 @@ class Ceph
     }
 
     /**
+     * 列出容器中的文件夹、对象
+     *
+     * @param array $args = [Bucket, Dir]
+     *
+     * @return mixed
+     */
+    public function listDirectoryObjects($args = [])
+    {
+        if ( ! isset($args['Bucket'])) { return []; }
+        $args['Bucket'] = trim($args['Bucket']);
+        if ( ! isset($args['Dir'])) { $args['Dir'] = ''; }
+        $args['Dir'] = trim($args['Dir']);
+
+        $as = [];
+
+        //没有指定文件夹
+        if($args['Dir'] == '')
+        {
+            $all = $this->listObjects($args);
+            if(isset($all['Contents']) && !empty($all['Contents'])){
+                foreach($all['Contents'] as $a){
+                    $a['LastModified'] = $a['LastModified']->__toString();
+                    $as[] = $a;
+                }
+            }
+        }
+        //指定了文件夹
+        else
+        {
+            $last = mb_substr($args['Dir'], -1, 1, 'utf-8');
+            if('/' != $last) { $args['Dir'] .= '/'; }
+            $objects = $this->s3->getIterator('ListObjects', array(
+                "Bucket" => $args['Bucket'],
+                "Prefix" => $args['Dir']
+            ));
+            foreach ($objects as $object) {
+                $object['LastModified'] = $object['LastModified']->__toString();
+                $as[] = $object;
+            }
+        }
+
+        //开始处理文件夹
+        $result = [];
+        $folder_check = [];
+        foreach($as as $a)
+        {
+            $a['Dirs'] = '';
+            if($args['Dir'] != ''){
+                //$a['Key'] = mb_substr($a['Key'], 0, $args['Dir']);
+                $a['Dirs'] = $args['Dir'];
+            }
+            if(false === strpos($a['Key'], '/')){
+                $a['_folder_or_file_'] = 'file';
+                $result[] = $a;
+            }else{
+                $folder = mb_substr($a['Key'], 0, strpos($a['Key'], '/'));
+                if( ! in_array($folder, $folder_check)){
+                    $folder_check[] = $folder;
+                    array_unshift(
+                        $result,
+                        [
+                            '_folder_or_file_'=>'folder',
+                            'Key'=>$folder,
+                            'LastModified'=>'',
+                            'ETag'=>'',
+                            'Size'=>'',
+                            'StorageClass'=>'',
+                            'Owner'=>[
+                                'DisplayName'=>'',
+                                'ID'=>''
+                            ],
+                        ]
+                    );
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * 删除对象
      *
      * @param array $args = [Bucket, Key]
@@ -337,6 +406,7 @@ class Ceph
         if ( ! isset($args['Source'])) { return false; }
         $uploader = new MultipartUploader($this->s3, $args['Source'], ['bucket'=>$args['Bucket'], 'key'=>$args['Key']]);
         try {
+            set_time_limit(0);
             $result = $uploader->upload();
             return true === $full ? $result : $result['ObjectURL'];
         } catch (MultipartUploadException $e) {
