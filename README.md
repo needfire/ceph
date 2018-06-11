@@ -45,6 +45,8 @@ $ceph->s3->createObject(['Bucket'=>'my-bucket-1', 'Key'=>'my-obj-1', 'Body'=>fop
 $ceph->s3->multipartUpload(['Bucket'=>'my-bucket-1', 'Key'=>'my-obj-1', 'Source'=>'C:\Users\admin\Desktop\pycharm-community-2017.3.4.exe']);
 $ceph->s3->listObjects(['Bucket'=>'my-bucket-1']);
 $ceph->s3->listObjectsNames(['Bucket'=>'my-bucket-1']);
+//文件、文件夹方式列出
+$ceph->s3->listFolderFile(['Bucket'=>'my-bucket-1', 'Dir'=>'my-dir-1'])
 $ceph->s3->deleteObject(['Bucket'=>'my-bucket-1', 'Key'=>'my-obj-1']);
 $ceph->s3->getObjectAcl(['Bucket'=>'my-bucket-1', 'Key'=>'my-obj-1']);
 //临时URL

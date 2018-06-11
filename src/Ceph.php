@@ -242,7 +242,7 @@ class Ceph
      *
      * @return mixed
      */
-    public function listDirectoryObjects($args = [])
+    public function listFolderFile($args = [])
     {
         if ( ! isset($args['Bucket'])) { return []; }
         $args['Bucket'] = trim($args['Bucket']);
