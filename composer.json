@@ -4,7 +4,8 @@
   "type": "library",
   "keywords": [
     "ceph",
-    "s3"
+    "s3",
+    "aws"
   ],
   "time": "2018-06-04",
   "authors": [
