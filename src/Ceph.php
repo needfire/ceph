@@ -251,7 +251,7 @@ class Ceph
 
         $as = [];
 
-        //没有指定文件夹
+        //取数据 - 没指定文件夹
         if($args['Dir'] == '')
         {
             $all = $this->listObjects($args);
@@ -262,7 +262,7 @@ class Ceph
                 }
             }
         }
-        //指定了文件夹
+        //取数据 - 指定了文件夹
         else
         {
             $last = mb_substr($args['Dir'], -1, 1, 'utf-8');
@@ -277,43 +277,61 @@ class Ceph
             }
         }
 
-        //开始处理文件夹
-        $result = [];
-        $folder_check = [];
-        foreach($as as $a)
+        //处理数据
+        return $this->dataToFolderFile($args['Dir'], $as);
+    }
+
+    /**
+     * 列出容器中的文件夹、对象
+     *
+     * @param string $current_dir_path = 'dir1/dir1_1/...'
+     * @param array  $ds = [['Key'=>'dir1/dir1_1/he.txt'], ['Key'=>'dir1/dir1_1/ge.txt'],...]
+     *
+     * @return mixed
+     */
+    private function dataToFolderFile($current_dir_path='', $ds=[])
+    {
+        $current_dir_path = trim($current_dir_path);
+        $current_dir_array = ($current_dir_path != '') ? explode('/', $current_dir_path) : [];
+        $current_dir_array = array_filter($current_dir_array);//过滤掉空值
+        //先把 current_dir 前缀去掉
+        if( ! empty($current_dir_array))
         {
-            $a['Dirs'] = '';
-            if($args['Dir'] != ''){
-                //$a['Key'] = mb_substr($a['Key'], 0, $args['Dir']);
-                $a['Dirs'] = $args['Dir'];
+            $dir_string = implode('/', $current_dir_array).'/';
+            foreach($ds as &$d)
+            {
+                //以 $dir_string 开头
+                if(mb_strpos($d['Key'], $dir_string) === 0)
+                {
+                    $d['Key'] = mb_substr($d['Key'], mb_strlen($dir_string));
+                }
             }
-            if(false === strpos($a['Key'], '/')){
-                $a['_folder_or_file_'] = 'file';
-                $result[] = $a;
-            }else{
-                $folder = mb_substr($a['Key'], 0, strpos($a['Key'], '/'));
-                if( ! in_array($folder, $folder_check)){
-                    $folder_check[] = $folder;
-                    array_unshift(
-                        $result,
-                        [
-                            '_folder_or_file_'=>'folder',
-                            'Key'=>$folder,
-                            'LastModified'=>'',
-                            'ETag'=>'',
-                            'Size'=>'',
-                            'StorageClass'=>'',
-                            'Owner'=>[
-                                'DisplayName'=>'',
-                                'ID'=>''
-                            ],
-                        ]
-                    );
+            unset($d);
+        }
+        //准备文件夹
+        $rs_files = $rs_folders = $had_folders = [];
+        //处理 文件 和 文件夹
+        $cd = empty($current_dir_array) ? '' : implode('/', $current_dir_array).'/';
+        foreach($ds as $d)
+        {
+            $d['Dir'] = $cd;
+            if(false === strpos($d['Key'], '/'))
+            {
+                $d['_folder_or_file_'] = 'file';
+                $rs_files[] = $d;
+            }
+            else
+            {
+                $d['_folder_or_file_'] = 'folder';
+                $t = explode('/', $d['Key']);
+                if( ! in_array($t[0], $had_folders)){
+                    $d['Key'] = $t[0];
+                    $rs_folders[] = $d;
+                    $had_folders[] = $t[0];//记录一下
                 }
             }
         }
-
-        return $result;
+        return rs(0, 'ok', ['dts'=>array_merge($rs_folders, $rs_files), 'dir_array'=>$current_dir_array]);
     }
 
     /**
