@@ -379,7 +379,8 @@ class Ceph
                     'Key' => (string)$args['Key']
                 ]
             );
-            $expire = intval($args['expire']);
+            $expire = isset($args['expire']) ? intval($args['expire']) : 0;
+            if($expire < 1){ $expire = 180; }
             $request = $this->s3->createPresignedRequest($command, "+$expire seconds");
             return true === $only_url ? (string)$request->getUri() : $request;
         } catch (\Exception $e) {
