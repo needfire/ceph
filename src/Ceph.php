@@ -1,12 +1,26 @@
 <?php
 namespace majorbio;
 
+use Aws\Exception\AwsException;
+use Aws\S3\Exception\S3Exception;
 use Aws\S3\S3Client;
 use Aws\S3\MultipartUploader;
 use Aws\Exception\MultipartUploadException;
 
 //https://docs.aws.amazon.com/aws-sdk-php/v3/api/api-s3-2006-03-01.html
 //https://github.com/awsdocs/aws-doc-sdk-examples/tree/master/php/example_code/s3
+
+/*if( ! function_exists('rs'))
+{
+    function rs($c=0, $m='', $d=[])
+    {
+        $rt = [];
+        $rt['c'] = intval($c);
+        $rt['m'] = $m;
+        $rt['d'] = $d;
+        return $rt;
+    }
+}*/
 
 class Ceph
 {
@@ -29,11 +43,7 @@ class Ceph
                 'secret' => $config['secret_key'],
             ],
         ];
-        try {
-            $this->s3 = new S3Client($args);
-        } catch (\Exception $e) {
-            throw new \Exception("Ceph客户端创建失败: " . $e->getMessage());
-        }
+        $this->s3 = new S3Client($args);
     }
 
     /**
@@ -41,16 +51,29 @@ class Ceph
      *
      * @param array $args = [Bucket='xxx'[, ACL]]
      *
-     * @return bool|null
+     * @return array
      */
     public function createBucket($args = [])
     {
         try {
-            if ( ! isset($args['Bucket'])) { return false; }
+            if ( ! isset($args['Bucket'])) { return rs(1, '缺少Bucket名称'); }
             $this->s3->createBucket($args)->toArray();
-            return $this->existBucket(['Bucket' => $args['Bucket']]);
-        } catch (\Exception $e) {
-            return null;
+            $exist = $this->existBucket(['Bucket'=>$args['Bucket']]);
+            if($exist){
+                return rs(0, '创建成功', ['Bucket'=>$args['Bucket']]);
+            }else{
+                return rs(1, '缺少Bucket名称');
+            }
+        } catch (AwsException $e) {
+            $err = $e->getMessage();
+            if(mb_strpos($err, 'InvalidAccessKeyId') !== false){
+                $msg = 'access_key错误';
+            }elseif(mb_strpos($err, 'SignatureDoesNotMatch') !== false){
+                $msg = 'secret_key错误';
+            }else{
+                $msg = 'endpoint错误';
+            }
+            return rs(1, $msg);
         }
     }
 
@@ -59,21 +82,28 @@ class Ceph
      *
      * @param array $args = [Bucket='xxx']
      *
-     * @return bool|null
+     * @return array
      */
     public function deleteBucket($args = [])
     {
         try {
-            if ( ! isset($args['Bucket'])) { return true; }
+            if ( ! isset($args['Bucket'])) { return rs(1, '缺少Bucket名称'); }
             $this->s3->deleteBucket($args)->toArray();
             $exist = $this->existBucket(['Bucket' => $args['Bucket']]);
-            if (is_null($exist)) {
-                return $exist;
+            if ($exist) {
+                return rs(1, '没有删除成功');
             } else {
-                return !$exist;
+                return rs(0, '删除成功');
             }
-        } catch (\Exception $e) {
-            return null;
+        } catch (S3Exception $e) {
+            $msg = '系统错误';
+            $err = $e->getMessage();
+            if(mb_strpos($err, 'NoSuchBucket') !== false){
+                $msg = '不存在此容器';
+            }elseif(mb_strpos($err, 'AccessDenied') !== false){
+                $msg = '没有权限删除此容器';
+            }
+            return rs(1, $msg);
         }
     }
 
@@ -82,7 +112,7 @@ class Ceph
      *
      * @param array $args = [Bucket='xxx']
      *
-     * @return bool|null
+     * @return bool
      */
     public function existBucket($args = [])
     {
@@ -95,7 +125,7 @@ class Ceph
                 return false;
             }
         } catch (\Exception $e) {
-            return null;
+            return false;
         }
     }
 
@@ -104,14 +134,15 @@ class Ceph
      *
      * @param array $args
      *
-     * @return array|null
+     * @return array
      */
     public function listBuckets($args = [])
     {
         try {
-            return $this->s3->listBuckets($args)->toArray();
+            $buckets = $this->s3->listBuckets($args)->toArray();
+            return rs(0, 'ok', ['buckets'=>$buckets]);
         } catch (\Exception $e) {
-            return null;
+            return rs(0, 'ok', ['buckets'=>[]]);
         }
     }
 
@@ -120,15 +151,19 @@ class Ceph
      *
      * @param array $args
      *
-     * @return array|null
+     * @return array
      */
     public function listBucketsNames($args = [])
     {
         try {
             $buckets = $this->s3->listBuckets($args)->toArray();
-            return array_column($buckets['Buckets'], 'Name');
+            $result = [];
+            if( ! is_null($buckets) && isset($buckets['Buckets']) && is_array($buckets['Buckets']) && count($buckets['Buckets'])>0){
+                $result = array_column($buckets['Buckets'], 'Name');;
+            }
+            return rs(0, 'ok', ['buckets'=>$result]);
         } catch (\Exception $e) {
-            return null;
+            return rs(0, 'ok', ['buckets'=>[]]);
         }
     }
 
@@ -139,7 +174,7 @@ class Ceph
      *
      * @return mixed
      */
-    public function getBucketAcl($args = [])
+    /*public function getBucketAcl($args = [])
     {
         try {
             if ( ! isset($args['Bucket'])) { return false; }
@@ -147,14 +182,14 @@ class Ceph
         } catch (\Exception $e) {
             return null;
         }
-    }
+    }*/
 
     /**
      * 对象是否存在
      *
      * @param array $args = [Bucket, Key]
      *
-     * @return bool|null
+     * @return bool
      */
     public function existObject($args = [])
     {
@@ -168,7 +203,7 @@ class Ceph
                 return false;
             }
         } catch (\Exception $e) {
-            return null;
+            return false;
         }
     }
 
@@ -182,21 +217,31 @@ class Ceph
      *                  [ ACL = 'private|public-read|public-read-write|authenticated-read|aws-exec-read|bucket-owner-read|bucket-owner-full-control' ]
      *              ]
      *
-     * @return string|null
+     * @return array
      */
     public function createObject($args = [])
     {
         try {
-            if ( ! isset($args['Body']) && ! isset($args['SourceFile'])) { return false; }
-            if ( ! isset($args['Bucket'])) { return false; }
-            if ( ! isset($args['Key'])) { return false; }
+            if ( ! isset($args['Body']) && ! isset($args['SourceFile'])) { return rs(0, '缺少内容'); }
+            if ( ! isset($args['Bucket'])) { return rs(0, '缺少Bucket名称'); }
+            if ( ! isset($args['Key'])) { return rs(0, '缺少Key名称'); }
             $this->s3->putObject($args)->toArray();
-            return $this->existObject([
-                'Bucket' => $args['Bucket'],
-                'Key' => $args['Key']
-            ]);
+            $exist = $this->existObject(['Bucket'=>$args['Bucket'], 'Key'=>$args['Key']]);
+            if($exist){
+                return rs(0, '创建成功', ['Bucket'=>$args['Bucket']]);
+            }else{
+                return rs(1, '创建成功失败');
+            }
         } catch (\Exception $e) {
-            return null;
+            $err = $e->getMessage();
+            if(mb_strpos($err, 'InvalidAccessKeyId') !== false){
+                $msg = 'access_key错误';
+            }elseif(mb_strpos($err, 'SignatureDoesNotMatch') !== false){
+                $msg = 'secret_key错误';
+            }else{
+                $msg = 'endpoint错误';
+            }
+            return rs(1, $msg);
         }
     }
 
@@ -205,15 +250,16 @@ class Ceph
      *
      * @param array $args = [Bucket]
      *
-     * @return array|null
+     * @return array
      */
     public function listObjects($args = [])
     {
         try {
-            if ( ! isset($args['Bucket'])) { return []; }
-            return $this->s3->listObjects($args)->toArray();
+            if ( ! isset($args['Bucket'])) { return rs(1, '缺少Bucket名称', ['objects'=>[]]); }
+            $objects = $this->s3->listObjects($args)->toArray();
+            return rs(0, 'ok', ['objects'=>$objects]);
         } catch (\Exception $e) {
-            return null;
+            return rs(1, '系统错误', ['objects'=>[]]);
         }
     }
 
@@ -222,16 +268,20 @@ class Ceph
      *
      * @param array $args = [Bucket]
      *
-     * @return array|null
+     * @return array
      */
     public function listObjectsNames($args = [])
     {
         try {
-            if ( ! isset($args['Bucket'])) { return []; }
+            if ( ! isset($args['Bucket'])) { return rs(1, '缺少Bucket名称', ['objects'=>[]]); }
             $objects = $this->s3->listObjects($args)->toArray();
-            return array_column($objects['Contents'], 'Key');
+            $result = [];
+            if(!is_null($objects) && isset($objects['Contents']) && is_array($objects['Contents']) && count($objects['Contents'])>0){
+                $result = array_column($objects['Contents'], 'Key');
+            }
+            return rs(0, 'ok', ['objects'=>$result]);
         } catch (\Exception $e) {
-            return null;
+            return rs(1, '系统错误', ['objects'=>[]]);
         }
     }
 
@@ -240,11 +290,11 @@ class Ceph
      *
      * @param array $args = [Bucket, Dir]
      *
-     * @return mixed
+     * @return array
      */
     public function listFolderFile($args = [])
     {
-        if ( ! isset($args['Bucket'])) { return []; }
+        if ( ! isset($args['Bucket'])) { return rs(1, '缺少Bucket名称', ['objects'=>[]]); }
         $args['Bucket'] = trim($args['Bucket']);
         if ( ! isset($args['Dir'])) { $args['Dir'] = ''; }
         $args['Dir'] = trim($args['Dir']);
@@ -255,8 +305,9 @@ class Ceph
         if($args['Dir'] == '')
         {
             $all = $this->listObjects($args);
-            if(isset($all['Contents']) && !empty($all['Contents'])){
-                foreach($all['Contents'] as $a){
+            if(isset($all['d']['objects']['Contents']) && !empty($all['d']['objects']['Contents'])){
+                foreach($all['d']['objects']['Contents'] as $a){
+                    /** @noinspection PhpUndefinedMethodInspection */
                     $a['LastModified'] = $a['LastModified']->__toString();
                     $as[] = $a;
                 }
@@ -271,7 +322,8 @@ class Ceph
                 "Bucket" => $args['Bucket'],
                 "Prefix" => $args['Dir']
             ));
-            foreach ($objects as $object) {
+            foreach($objects as $object){
+                /** @noinspection PhpUndefinedMethodInspection */
                 $object['LastModified'] = $object['LastModified']->__toString();
                 $as[] = $object;
             }
@@ -339,25 +391,32 @@ class Ceph
      *
      * @param array $args = [Bucket, Key]
      *
-     * @return bool|null
+     * @return array
      */
     public function deleteObject($args = [])
     {
         try {
-            if ( ! isset($args['Bucket'])) { return false; }
-            if ( ! isset($args['Key'])) { return false; }
+            if ( ! isset($args['Bucket'])) { return rs(1, '缺少Bucket名称'); }
+            if ( ! isset($args['Key'])) { return rs(1, '缺少Key名称'); }
             $this->s3->deleteObject($args)->toArray();
             $exist = $this->existObject([
                 'Bucket' => $args['Bucket'],
                 'Key' => $args['Key']
             ]);
-            if (is_null($exist)) {
-                return $exist;
+            if ($exist) {
+                return rs(1, '删除失败');
             } else {
-                return !$exist;
+                return rs(0, '删除成功');
             }
-        } catch (\Exception $e) {
-            return null;
+        } catch (S3Exception $e) {
+            $msg = '系统错误';
+            $err = $e->getMessage();
+            if(mb_strpos($err, 'NoSuchBucket') !== false){
+                $msg = '不存在此容器';
+            }elseif(mb_strpos($err, 'AccessDenied') !== false){
+                $msg = '没有权限删除此对象';
+            }
+            return rs(1, $msg);
         }
     }
 
@@ -367,7 +426,7 @@ class Ceph
      * @param array $args = [Bucket, Key, expire(秒)]
      * @param bool  $only_url
      *
-     * @return string|null
+     * @return array
      */
     public function createPresignedRequest($args=[], $only_url=true)
     {
@@ -382,9 +441,17 @@ class Ceph
             $expire = isset($args['expire']) ? intval($args['expire']) : 0;
             if($expire < 1){ $expire = 180; }
             $request = $this->s3->createPresignedRequest($command, "+$expire seconds");
-            return true === $only_url ? (string)$request->getUri() : $request;
+            if($only_url){
+                return rs(0, 'ok', ['url'=>(string)$request->getUri()]);
+            }else{
+                return rs(0, 'ok', ['url_info'=>$request]);
+            }
         } catch (\Exception $e) {
-            return null;
+            if($only_url){
+                return rs(1, '系统错误', ['url'=>'']);
+            }else{
+                return rs(1, '系统错误', ['url_info'=>[]]);
+            }
         }
     }
 
@@ -395,7 +462,7 @@ class Ceph
      *
      * @return mixed
      */
-    public function getObjectAcl($args = [])
+    /*public function getObjectAcl($args = [])
     {
         try {
             if ( ! isset($args['Bucket'])) { return false; }
@@ -404,7 +471,7 @@ class Ceph
         } catch (\Exception $e) {
             return null;
         }
-    }
+    }*/
 
     /**
      * 创建对象
@@ -416,20 +483,21 @@ class Ceph
      *              ]
      * @param bool  $full
      *
-     * @return mixed
+     * @return array
      */
     public function multipartUpload($args=[], $full=true)
     {
-        if ( ! isset($args['Bucket'])) { return false; }
-        if ( ! isset($args['Key'])) { return false; }
-        if ( ! isset($args['Source'])) { return false; }
+        if ( ! isset($args['Bucket'])) { return rs(1, '缺少Bucket名称'); }
+        if ( ! isset($args['Key'])) { return rs(1, '缺少Key名称'); }
+        if ( ! isset($args['Source'])) { return rs(1, '缺少Source路径'); }
         $uploader = new MultipartUploader($this->s3, $args['Source'], ['bucket'=>$args['Bucket'], 'key'=>$args['Key']]);
         try {
             set_time_limit(0);
             $result = $uploader->upload();
-            return true === $full ? $result : $result['ObjectURL'];
+            $rt = (true === $full) ? $result : $result['ObjectURL'];
+            return rs(0, 'ok', ['result'=>$rt]);
         } catch (MultipartUploadException $e) {
-            return $e->getMessage();
+            return rs(0, 'ok', ['result'=>$e->getMessage()]);
         }
     }
 
@@ -446,20 +514,22 @@ class Ceph
     public function copyObject($args = [])
     {
         try {
-            if( ! isset($args['DestinationBucket'])){ return false; }
-            if( ! isset($args['DestinationKey'])){ return false; }
-            if( ! isset($args['CopySource'])){ return false; }
+            if( ! isset($args['DestinationBucket'])){ return rs(1, '缺少目标Bucket名称'); }
+            if( ! isset($args['DestinationKey'])){ return rs(1, '缺少目标Key名称'); }
+            if( ! isset($args['CopySource'])){ return rs(1, '缺少CopySource'); }
             $this->s3->copyObject([
                 'Bucket' => $args['DestinationBucket'],
                 'Key' => $args['DestinationKey'],
                 'CopySource' => $args['CopySource'],
             ]);
-            return $this->existObject([
-                'Bucket' => $args['DestinationBucket'],
-                'Key' => $args['DestinationKey']
-            ]);
+            $rs = $this->existObject(['Bucket'=>$args['DestinationBucket'], 'Key'=>$args['DestinationKey']]);
+            if($rs){
+                return rs(0, 'ok');
+            }else{
+                return rs(1, '复制失败');
+            }
         } catch (\Exception $e) {
-            return null;
+            return rs(1, '复制失败');
         }
     }
 }
