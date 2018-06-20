@@ -47,6 +47,43 @@ class Ceph
     }
 
     /**
+     * 字符串转 ascii
+     *
+     * @param string $str
+     *
+     * @return string
+     */
+    public function strToAscii($str = '')
+    {
+        $str = mb_convert_encoding($str, 'GB2312');
+        $change_after = '';
+        for($i=0; $i<strlen($str); $i++){
+            $temp_str = dechex(ord($str[$i]));
+            $change_after .= $temp_str[1].$temp_str[0];
+        }
+        return strtoupper($change_after);
+    }
+
+
+    /**
+     * ascii 转字符串
+     *
+     * @param string $ascii
+     *
+     * @return string
+     */
+    public function asciiToStr($ascii = '')
+    {
+        if(strpos($ascii,'-') != false){ return $ascii; }
+        $asc_arr = str_split(strtolower($ascii), 2);
+        $str = '';
+        for($i=0; $i<count($asc_arr); $i++){
+            $str .= chr(hexdec($asc_arr[$i][1].$asc_arr[$i][0]));
+        }
+        return mb_convert_encoding($str, 'UTF-8', 'GB2312');
+    }
+
+    /**
      * 创建容器
      *
      * @param array $args = [Bucket='xxx'[, ACL]]
@@ -57,10 +94,13 @@ class Ceph
     {
         try {
             if ( ! isset($args['Bucket'])) { return rs(1, '缺少Bucket名称'); }
+            $Bucket = $args['Bucket'];
+            //转成 ascii
+            $args['Bucket'] = $this->strToAscii($args['Bucket']);
             $this->s3->createBucket($args)->toArray();
-            $exist = $this->existBucket(['Bucket'=>$args['Bucket']]);
+            $exist = $this->existBucket(['Bucket'=>$Bucket]);
             if($exist){
-                return rs(0, '创建成功', ['Bucket'=>$args['Bucket']]);
+                return rs(0, '创建成功', ['Bucket'=>$Bucket]);
             }else{
                 return rs(1, '缺少Bucket名称');
             }
@@ -88,8 +128,11 @@ class Ceph
     {
         try {
             if ( ! isset($args['Bucket'])) { return rs(1, '缺少Bucket名称'); }
+            $Bucket = $args['Bucket'];
+            //转成 ascii
+            $args['Bucket'] = $this->strToAscii($args['Bucket']);
             $this->s3->deleteBucket($args)->toArray();
-            $exist = $this->existBucket(['Bucket' => $args['Bucket']]);
+            $exist = $this->existBucket(['Bucket' => $Bucket]);
             if ($exist) {
                 return rs(1, '没有删除成功');
             } else {
@@ -118,6 +161,8 @@ class Ceph
     {
         try {
             if ( ! isset($args['Bucket'])) { return false; }
+            //转成 ascii
+            $args['Bucket'] = $this->strToAscii($args['Bucket']);
             $result = $this->s3->headBucket($args)->toArray();
             if (isset($result['@metadata']['statusCode']) && $result['@metadata']['statusCode'] == '200') {
                 return true;
@@ -140,6 +185,9 @@ class Ceph
     {
         try {
             $buckets = $this->s3->listBuckets($args)->toArray();
+            foreach ($buckets['Buckets'] as $key => $value) {
+                $buckets['Buckets'][$key]['Name'] = $this->asciiToStr($value['Name']);
+            }
             return rs(0, 'ok', ['buckets'=>$buckets]);
         } catch (\Exception $e) {
             return rs(0, 'ok', ['buckets'=>[]]);
@@ -157,6 +205,9 @@ class Ceph
     {
         try {
             $buckets = $this->s3->listBuckets($args)->toArray();
+            foreach ($buckets['Buckets'] as $key => $value) {
+                $buckets['Buckets'][$key]['Name'] = $this->asciiToStr($value['Name']);
+            }
             $result = [];
             if( ! is_null($buckets) && isset($buckets['Buckets']) && is_array($buckets['Buckets']) && count($buckets['Buckets'])>0){
                 $result = array_column($buckets['Buckets'], 'Name');;
@@ -196,6 +247,8 @@ class Ceph
         try {
             if ( ! isset($args['Bucket'])) { return false; }
             if ( ! isset($args['Key'])) { return false; }
+            //转成 ascii
+            $args['Bucket'] = $this->strToAscii($args['Bucket']);
             $result = $this->s3->headObject($args)->toArray();
             if (isset($result['@metadata']['statusCode']) && $result['@metadata']['statusCode'] == '200') {
                 return true;
@@ -225,10 +278,13 @@ class Ceph
             if ( ! isset($args['Body']) && ! isset($args['SourceFile'])) { return rs(0, '缺少内容'); }
             if ( ! isset($args['Bucket'])) { return rs(0, '缺少Bucket名称'); }
             if ( ! isset($args['Key'])) { return rs(0, '缺少Key名称'); }
+            $Bucket = $args['Bucket'];
+            //转成 ascii
+            $args['Bucket'] = $this->strToAscii($args['Bucket']);
             $this->s3->putObject($args)->toArray();
-            $exist = $this->existObject(['Bucket'=>$args['Bucket'], 'Key'=>$args['Key']]);
+            $exist = $this->existObject(['Bucket'=>$Bucket, 'Key'=>$args['Key']]);
             if($exist){
-                return rs(0, '创建成功', ['Bucket'=>$args['Bucket']]);
+                return rs(0, '创建成功', ['Bucket'=>$Bucket]);
             }else{
                 return rs(1, '创建成功失败');
             }
@@ -256,6 +312,8 @@ class Ceph
     {
         try {
             if ( ! isset($args['Bucket'])) { return rs(1, '缺少Bucket名称', ['objects'=>[]]); }
+            //转成 ascii
+            $args['Bucket'] = $this->strToAscii($args['Bucket']);
             $objects = $this->s3->listObjects($args)->toArray();
             return rs(0, 'ok', ['objects'=>$objects]);
         } catch (\Exception $e) {
@@ -274,6 +332,8 @@ class Ceph
     {
         try {
             if ( ! isset($args['Bucket'])) { return rs(1, '缺少Bucket名称', ['objects'=>[]]); }
+            //转成 ascii
+            $args['Bucket'] = $this->strToAscii($args['Bucket']);
             $objects = $this->s3->listObjects($args)->toArray();
             $result = [];
             if(!is_null($objects) && isset($objects['Contents']) && is_array($objects['Contents']) && count($objects['Contents'])>0){
@@ -316,6 +376,8 @@ class Ceph
         //取数据 - 指定了文件夹
         else
         {
+            //转成 ascii
+            $args['Bucket'] = $this->strToAscii($args['Bucket']);
             $last = mb_substr($args['Dir'], -1, 1, 'utf-8');
             if('/' != $last) { $args['Dir'] .= '/'; }
             $objects = $this->s3->getIterator('ListObjects', array(
@@ -398,6 +460,8 @@ class Ceph
         try {
             if ( ! isset($args['Bucket'])) { return rs(1, '缺少Bucket名称'); }
             if ( ! isset($args['Key'])) { return rs(1, '缺少Key名称'); }
+            //转成 ascii
+            $args['Bucket'] = $this->strToAscii($args['Bucket']);
             $this->s3->deleteObject($args)->toArray();
             $exist = $this->existObject([
                 'Bucket' => $args['Bucket'],
@@ -431,6 +495,8 @@ class Ceph
     public function createPresignedRequest($args=[], $only_url=true)
     {
         try {
+            //转成 ascii
+            $args['Bucket'] = $this->strToAscii($args['Bucket']);
             $command = $this->s3->getCommand(
                 'GetObject',
                 [
@@ -490,6 +556,8 @@ class Ceph
         if ( ! isset($args['Bucket'])) { return rs(1, '缺少Bucket名称'); }
         if ( ! isset($args['Key'])) { return rs(1, '缺少Key名称'); }
         if ( ! isset($args['Source'])) { return rs(1, '缺少Source路径'); }
+        //转成 ascii
+        $args['Bucket'] = $this->strToAscii($args['Bucket']);
         $uploader = new MultipartUploader($this->s3, $args['Source'], ['bucket'=>$args['Bucket'], 'key'=>$args['Key']]);
         try {
             set_time_limit(0);
