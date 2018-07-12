@@ -7,14 +7,8 @@ class RgwAdminClient
 {
     public $rgw = null;
 
-    public function __construct()
+    public function __construct(array $rgw_config = [])
     {
-        //admin 用户配置
-        $rgw_config = [
-            'apiUrl' => 'http://',
-            'apiKey' => '',
-            'secretKey' => '',
-        ];
         $this->rgw = new Client($rgw_config);
     }
 
