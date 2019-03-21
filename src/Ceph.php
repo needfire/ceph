@@ -502,6 +502,81 @@ class Ceph
     }
 
     /**
+     * 启用文件分段上传
+     *
+     * @param array $args = [
+     *                  Bucket = <string>,
+     *                  Key = <string>
+     *              ]
+     * @return mixed
+     */
+    public function createMultipartUpload($args = [])
+    {
+        if ( ! isset($args['Bucket'])) { return rs(1, '缺少Bucket名称'); }
+        if ( ! isset($args['Key'])) { return rs(1, '缺少Key名称'); }
+        $result = $this->s3->createMultipartUpload([
+            'Bucket' => $args['Bucket'],
+            'Key' => $args['Key']
+        ])->toArray();
+        return rs(0, 'ok', $result);
+    }
+
+    /**
+     * 分段上传 上传文件块
+     *
+     * @param array $args = [
+     *                  Bucket = <string>,
+     *                  Key = <string>,
+     *                  PartNumber = <int>,
+     *                  Body = <string || resource || Psr\Http\Message\StreamInterface>,
+     *                  UploadId = <string>
+     *              ]
+     * @return mixed
+     */
+    public function uploadPart($args = [])
+    {
+        if ( ! isset($args['Bucket'])) { return rs(1, '缺少Bucket名称'); }
+        if ( ! isset($args['Key'])) { return rs(1, '缺少Key名称'); }
+        if ( ! isset($args['PartNumber'])) { return rs(1, '缺少PartNumber名称'); }
+        if ( ! isset($args['Body'])) { return rs(1, '缺少Body名称'); }
+        if ( ! isset($args['UploadId'])) { return rs(1, '缺少UploadId名称'); }
+        $result = $this->s3->uploadPart([
+            'Bucket' => $args['Bucket'],
+            'Key' => $args['Key'],
+            'PartNumber' => $args['PartNumber'],
+            'Body' => $args['Body'],
+            'UploadId' => $args['UploadId']
+        ])->toArray();
+        return rs(0, 'ok', $result);
+    }
+
+    /**
+     * 完成所有文件块上传后 合并这些文件
+     *
+     * @param array $args = [
+     *                  Bucket = <string>,
+     *                  Key = <string>,
+     *                  UploadId = <string>,
+     *                  MultipartUpload = <array>
+     *              ]
+     * @return mixed
+     */
+    public function completeMultipartUpload($args = [])
+    {
+        if ( ! isset($args['Bucket'])) { return rs(1, '缺少Bucket名称'); }
+        if ( ! isset($args['Key'])) { return rs(1, '缺少Key名称'); }
+        if ( ! isset($args['UploadId'])) { return rs(1, '缺少UploadId名称'); }
+        if ( ! isset($args['MultipartUpload'])) { return rs(1, '缺少MultipartUpload名称'); }
+        $result = $this->s3->completeMultipartUpload([
+            'Bucket' => $args['Bucket'],
+            'Key' => $args['Key'],
+            'UploadId' => $args['UploadId'],
+            'MultipartUpload' => $args['MultipartUpload']
+        ])->toArray();
+        return rs(0, 'ok', $result);
+    }
+
+    /**
      * 创建对象<暂时只能账号内复制>
      *
      * @param array $args = [

@@ -12,6 +12,10 @@
     {
       "name": "Liu",
       "email": "guofeng.liu@majorbio.com"
+    },
+    {
+      "name": "Du",
+      "email": "weiqiang.du@majorbio.com"
     }
   ],
   "require": {
